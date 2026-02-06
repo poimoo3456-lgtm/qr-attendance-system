@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ระบบเช็คชื่อ QR</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+body{font-family:sans-serif;background:#eef2f5;margin:0}
+header{background:#1565c0;color:#fff;padding:10px;text-align:center}
+section{padding:15px}
+.card{background:#fff;padding:15px;margin-bottom:15px;border-radius:10px}
+button{padding:8px 14px;margin:4px;border:none;border-radius:8px;background:#1565c0;color:#fff}
+input,select{padding:6px;margin:4px;width:95%}
+.hidden{display:none}
+.qrbox{background:#eee;padding:10px;margin-top:10px}
+</style>
+</head>
+
+<body>
+<header>
+<h2 id="schoolName">โรงเรียนของฉัน</h2>
+</header>
+
+<section id="home">
+<div class="card">
+<h3>เลือกเข้าสู่ระบบ</h3>
+<button onclick="show('student')">นักเรียน</button>
+<button onclick="show('teacherLogin')">ครู</button>
+<button onclick="adminLogin()">หลังบ้าน</button>
+</div>
+</section>
+
+<!-- นักเรียน -->
+<section id="student" class="hidden">
+<div class="card">
+<h3>ระบบนักเรียน</h3>
+<input id="stuId" placeholder="รหัสนักเรียน">
+<button onclick="studentLogin()">เข้า</button>
+<div id="stuData"></div>
+<button onclick="reload()">ออก</button>
+</div>
+</section>
+
+<!-- ครู -->
+<section id="teacherLogin" class="hidden">
+<div class="card">
+<h3>ระบบครู</h3>
+<input id="tUser" placeholder="Username">
+<input id="tPass" type="password" placeholder="Password">
+<button onclick="teacherLogin()">เข้า</button>
+<button onclick="reload()">ออก</button>
+</div>
+</section>
+
+<section id="teacher" class="hidden">
+<div class="card">
+<h3>เช็คชื่อด้วย QR</h3>
+<select id="subjectSelect"></select>
+<div id="reader" style="width:100%"></div>
+<select id="status">
+<option>มา</option>
+<option>มาสาย</option>
+<option>ขาด</option>
+<option>ลากิจ</option>
+<option>ลาป่วย</option>
+</select>
+<button onclick="stopScan()">หยุดสแกน</button>
+<div id="result"></div>
+<button onclick="reload()">ออก</button>
+</div>
+</section>
+
+<!-- หลังบ้าน -->
+<section id="admin" class="hidden">
+<div class="card">
+<h3>ระบบหลังบ้าน</h3>
+
+<h4>ตั้งค่าโรงเรียน</h4>
+<input id="schoolInput">
+<button onclick="saveSchool()">บันทึก</button>
+
+<h4>เพิ่มครู</h4>
+<input id="newTUser" placeholder="username">
+<input id="newTPass" placeholder="password">
+<button onclick="addTeacher()">เพิ่มครู</button>
+
+<h4>เพิ่มรายวิชา</h4>
+<input id="newSub">
+<select id="subTeacher"></select>
+<button onclick="addSubject()">เพิ่มวิชา</button>
+
+<h4>เพิ่มนักเรียน</h4>
+<input id="newStuId" placeholder="รหัส">
+<input id="newStuName" placeholder="ชื่อ">
+<input id="newStuClass" placeholder="ห้อง">
+<button onclick="addStudent()">เพิ่มนักเรียน</button>
+
+<button onclick="reload()">ออก</button>
+</div>
+</section>
+
+<script>
+let students=JSON.parse(localStorage.students||"[]");
+let teachers=JSON.parse(localStorage.teachers||"[]");
+let subjects=JSON.parse(localStorage.subjects||"[]");
+let logs=JSON.parse(localStorage.logs||"[]");
+
+schoolName.innerText=localStorage.school||"โรงเรียนของฉัน";
+
+function show(id){
+document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));
+document.getElementById(id).classList.remove("hidden");
+}
+
+function reload(){location.reload();}
+
+function adminLogin(){
+let p=prompt("รหัสหลังบ้าน");
+if(p==="1669"){show("admin");loadAdmin();}
+else alert("รหัสผิด");
+}
+
+function saveSchool(){
+localStorage.school=schoolInput.value;
+reload();
+}
+
+function addTeacher(){
+teachers.push({u:newTUser.value,p:newTPass.value});
+localStorage.teachers=JSON.stringify(teachers);
+alert("เพิ่มครูแล้ว");
+}
+
+function addSubject(){
+subjects.push({name:newSub.value,teacher:subTeacher.value});
+localStorage.subjects=JSON.stringify(subjects);
+alert("เพิ่มวิชาแล้ว");
+}
+
+function addStudent(){
+students.push({
+id:newStuId.value,
+name:newStuName.value,
+class:newStuClass.value
+});
+localStorage.students=JSON.stringify(students);
+alert("เพิ่มนักเรียนแล้ว");
+}
+
+function studentLogin(){
+let s=students.find(x=>x.id===stuId.value);
+if(!s){alert("ไม่พบนักเรียน");return;}
+let html=`<p>ชื่อ: ${s.name}</p>
+<p>ห้อง: ${s.class}</p>
+<div class="qrbox">QR CODE: ${s.id}</div>
+<h4>ประวัติ</h4>`;
+logs.filter(l=>l.sid===s.id).forEach(l=>{
+html+=`${l.date} | ${l.sub} | ${l.status}<br>`;
+});
+stuData.innerHTML=html;
+}
+
+function teacherLogin(){
+let t=teachers.find(x=>x.u===tUser.value && x.p===tPass.value);
+if(!t){alert("ไม่มีสิทธิ์");return;}
+show("teacher");
+subjectSelect.innerHTML="";
+subjects.filter(s=>s.teacher===t.u)
+.forEach(s=>subjectSelect.innerHTML+=`<option>${s.name}</option>`);
+startScan();
+}
+
+let scanner;
+function startScan(){
+scanner=new Html5Qrcode("reader");
+scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+(code)=>{
+logs.push({
+sid:code,
+sub:subjectSelect.value,
+status:status.value,
+date:new Date().toLocaleString()
+});
+localStorage.logs=JSON.stringify(logs);
+result.innerText="บันทึกแล้ว: "+code;
+},
+(err)=>{}
+);
+}
+
+function stopScan(){
+if(scanner) scanner.stop();
+}
+
+function loadAdmin(){
+subTeacher.innerHTML="";
+teachers.forEach(t=>{
+subTeacher.innerHTML+=`<option>${t.u}</option>`;
+});
+}
+</script>
+</body>
+</html>
